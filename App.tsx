@@ -18,50 +18,96 @@ import {
  const App = () => {
   
   const [highscore, setHighscore] = useState(0);
-  const [score, setScore] = useState(0);
-  const [level, setLevel] = useState(8);
-  const [lives, setLives] = useState(3);
-  const [page, setPage] = useState('home');
+  const [score, setScore] = useState<number>(0);
+  const [endScore, setEndScore] = useState<number>(0);
+  const [level, setLevel] = useState<number>(1);
+  const [lives, setLives] = useState<number>(3);
+  const [page, setPage] = useState<string>('home');
   const [values, setValues] = useState<Array<{id: number, value: number, tapped: boolean}>>([])
-  const [levelStarted, setLevelStarted] = useState(false);
-  const [current, setCurrent] = useState(1);
+  const [levelStarted, setLevelStarted] = useState<boolean>(false);
+  const [current, setCurrent] = useState<number>(1);
 
   const navigate = (value: string) => setPage(value);
 
   const makeLevel = () => {
-    let newValues = [];
-    for(let i = 1; i < 25; i++){
-      newValues.push({id: i, value: -1, tapped: false});
+    if(level > 21){
+      setLevelStarted(false);
+      setLives(3);
+      setLevel(1);
+      setScore(0);
+      setCurrent(1);
+      setEndScore(score);
+      navigate('gameWon');
     }
-    for(let i = 1; i < level + 4; i++){
-      newValues.shift();
-      newValues.push({id: i, value: i, tapped: false});
+    else{
+      let newValues = [];
+      for(let i = 1; i < 25; i++){
+        newValues.push({id: i, value: -1, tapped: false});
+      }
+      for(let i = 1; i < level + 4; i++){
+        newValues.shift();
+        newValues.push({id: i, value: i, tapped: false});
+      }
+      newValues.sort(() => Math.random() - 0.5);
+      setValues(newValues);
+      navigate('game');
     }
-    newValues.sort(() => Math.random() - 0.5);
-    setValues(newValues);
-    navigate('game');
   }
 
   const getNext = (id: number) => {
     if(!levelStarted){
       setLevelStarted(true);
     }
-    let updatedValues = values;
-    console.log(updatedValues);
-    console.log("===================================================================================================================")
-    for (let i = 0; i < 24; i++){
-      if (updatedValues[i].id === id){
-        //console.log(i + " " + id + " " + updatedValues[i].id + " " + updatedValues[i].value + " " + updatedValues[i].tapped)
-        updatedValues[i].tapped = true;
-        //console.log(i + " " + id + " " + updatedValues[i].id + " " + updatedValues[i].value + " " + updatedValues[i].tapped)
+    let updatedValues = [...values];
+    var value: {id: number, value: number, tapped: boolean} | undefined =  (updatedValues.find(element => element.id == id));
+    if(value != undefined){
+      value.tapped = true;
+    }
+    if(value != undefined){
+      if(value.value === current){
+        if(value.value === level + 3){
+          setCurrent(1);
+          setLevel(level + 1);
+          setLevelStarted(false);
+          setScore(score + 1);
+          navigate('levelDone')
+        }
+        else{
+          setCurrent(current + 1);
+        }
+      }
+      else{
+        if(lives <= 1){
+          if(score > highscore){
+            setHighscore(score);
+          }
+          setLevelStarted(false);
+          setLives(3);
+          setLevel(1);
+          setScore(0);
+          setCurrent(1);
+          setEndScore(score);
+          navigate('gameOver')
+        }
+        else{
+          setLevelStarted(false);
+          setLives(lives - 1);
+          setCurrent(1);
+          navigate('fail');
+        }
       }
     }
-    console.log(updatedValues);
     setValues(updatedValues);
-    console.log("===================================================================================================================")
-    console.log(values);
   }
-  
+
+  const resetGame = () => {
+    setScore(0);
+    setLevel(1);
+    setLives(3);
+    setLevelStarted(false);
+    setCurrent(1);
+    navigate('home')
+  }
 
    return (
      <SafeAreaView style={styles.sectionContainer}>
@@ -82,7 +128,7 @@ import {
               "Quit", 
               "Are you sure, all progress will be lost.",
               [
-                { text: "Quit", onPress: () => navigate('home') },
+                { text: "Quit", onPress: () => resetGame() },
                 { text: "Cancel", onPress: () => navigate('game') }
               ])}><Text>Quit</Text></TouchableOpacity>
             </View>
@@ -94,8 +140,9 @@ import {
         <View style={styles.gameContent}>
           {values.map(item => (
             <View  key={item.id}>
-              {item.value === -1 ? <View style={styles.emptyTile}><Text style={styles.tileText}></Text></View> : <TouchableOpacity onPress={() => getNext(item.id)} style={item.tapped ? styles.emptyTile : (levelStarted ? styles.hiddenTile : styles.tile)}><Text style={styles.tileText}>{item.value}</Text></TouchableOpacity>}
               
+              {item.value === -1 ? <View style={styles.emptyTile}><Text style={styles.tileText}></Text></View> : <TouchableOpacity onPress={!item.tapped ? () => getNext(item.id) : () => void(0)}>
+                <View style={item.tapped ? styles.emptyTile : (levelStarted ? styles.hiddenTile : styles.tile)}><Text style={styles.tileText}>{item.id}</Text></View></TouchableOpacity>}
             </View>
           ))}
         </View>
@@ -104,7 +151,7 @@ import {
        <View style={styles.topView}>
          <Text style={styles.topViewText}>You</Text>
          <Text style={styles.topViewText}>Failed</Text>
-         <TouchableOpacity style={styles.playbutton} onPress={() => navigate('game')}>
+         <TouchableOpacity style={styles.playbutton} onPress={() => makeLevel()}>
             <Text style={styles.playbuttonText}>Try again</Text>
           </TouchableOpacity>
           <Text style={styles.topViewText}>Lives left:</Text>
@@ -114,15 +161,23 @@ import {
        <View style={styles.topView}>
          <Text style={styles.topViewText}>Good</Text>
          <Text style={styles.topViewText}>Job</Text>
-         <TouchableOpacity style={styles.playbutton} onPress={() => navigate('game')}><Text style={styles.playbuttonText}>Next level</Text></TouchableOpacity>
+         <TouchableOpacity style={styles.playbutton} onPress={() => makeLevel()}><Text style={styles.playbuttonText}>Next level</Text></TouchableOpacity>
        </View>
        : page === 'gameOver' ?
        <View style={styles.topView}>
          <Text style={styles.topViewText}>Game</Text>
          <Text style={styles.topViewText}>Over</Text>
-         <Text style={styles.highscoreText}>Score: {score}</Text>
+         <Text style={styles.highscoreText}>Score: {endScore}</Text>
          <TouchableOpacity style={styles.playbutton} onPress={() => navigate('home')}><Text style={styles.playbuttonText}>Home</Text></TouchableOpacity>
-         <TouchableOpacity style={styles.playbutton} onPress={() => navigate('game')}><Text style={styles.playbuttonText}>Play again</Text></TouchableOpacity>
+         <TouchableOpacity style={styles.playbutton} onPress={() => makeLevel()}><Text style={styles.playbuttonText}>Play again</Text></TouchableOpacity>
+       </View>
+       : page === 'gameWon' ?
+       <View style={styles.topView}>
+         <Text style={styles.topViewText}>You</Text>
+         <Text style={styles.topViewText}>Win!!!</Text>
+         <Text style={styles.highscoreText}>Score: {endScore}</Text>
+         <TouchableOpacity style={styles.playbutton} onPress={() => navigate('home')}><Text style={styles.playbuttonText}>Home</Text></TouchableOpacity>
+         <TouchableOpacity style={styles.playbutton} onPress={() => makeLevel()}><Text style={styles.playbuttonText}>Play again</Text></TouchableOpacity>
        </View>
        :
        <View></View>
@@ -170,7 +225,10 @@ import {
    },
    gameTopViewLeft: {
      display: 'flex',
+     flexDirection: 'row',
+     justifyContent: 'center',
      width: '20%',
+     alignSelf: 'center'
    },
    gameTopViewRight: {
     display: 'flex',
@@ -217,7 +275,7 @@ import {
    borderBottomLeftRadius: 20,
    borderBottomRightRadius: 20,
    borderColor: '#FFFFFF',
-   backgroundColor: '#FFFFFF'
+   backgroundColor: '#FFFFFF',
   },
   emptyTile: {
     width: (windowWidth - 40) / 4,
@@ -226,8 +284,6 @@ import {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-   borderColor: '#FFFFFF',
-   borderWidth: 0
   },
    tileText: {
     fontSize: 25,
